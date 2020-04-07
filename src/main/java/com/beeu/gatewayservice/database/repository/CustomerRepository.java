@@ -11,5 +11,9 @@ public interface CustomerRepository extends CrudRepository<CustomerEntity, Long>
 
     Boolean existsByBeeId(String beeId);
 
+    CustomerEntity findByApiKey(String apiKey);
+
+    Boolean existsByApiKeyAndActive(String apiKey, Boolean active);
+
     CustomerEntity findByBeeId(String beeId);
 }

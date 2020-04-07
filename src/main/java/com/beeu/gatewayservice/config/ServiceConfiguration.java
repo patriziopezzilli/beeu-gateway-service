@@ -4,6 +4,7 @@ import org.springframework.amqp.core.AcknowledgeMode;
 import org.springframework.amqp.rabbit.annotation.EnableRabbit;
 import org.springframework.amqp.rabbit.config.SimpleRabbitListenerContainerFactory;
 import org.springframework.amqp.rabbit.connection.CachingConnectionFactory;
+import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,7 +23,6 @@ import org.springframework.orm.jpa.LocalContainerEntityManagerFactoryBean;
 import org.springframework.orm.jpa.vendor.HibernateJpaVendorAdapter;
 import org.springframework.transaction.PlatformTransactionManager;
 
-import javax.annotation.PostConstruct;
 import javax.persistence.EntityManagerFactory;
 import javax.sql.DataSource;
 import java.util.Properties;
@@ -50,15 +50,25 @@ public class ServiceConfiguration {
     @Autowired
     RabbitProperties rabbitProperties;
 
-    @Bean
-    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory() {
+    private CachingConnectionFactory connFactory() {
         CachingConnectionFactory connectionFactory = new CachingConnectionFactory(rabbitProperties.getHost());
         connectionFactory.setUsername(rabbitProperties.getUsername());
         connectionFactory.setPassword(rabbitProperties.getPassword());
         connectionFactory.setVirtualHost(rabbitProperties.getUsername());
+        return connectionFactory;
+    }
 
+    @Bean
+    public RabbitTemplate amqpTemplate() {
+        final RabbitTemplate rabbitTemplate = new RabbitTemplate(connFactory());
+        rabbitTemplate.setMessageConverter(messageConverter());
+        return rabbitTemplate;
+    }
+
+    @Bean
+    public SimpleRabbitListenerContainerFactory rabbitListenerContainerFactory() {
         SimpleRabbitListenerContainerFactory factory = new SimpleRabbitListenerContainerFactory();
-        factory.setConnectionFactory(connectionFactory);
+        factory.setConnectionFactory(connFactory());
         factory.setMessageConverter(jsonMessageConverter());
         factory.setAcknowledgeMode(AcknowledgeMode.AUTO);
         factory.setConcurrentConsumers(rabbitProperties.getListener().getSimple().getConcurrency());
@@ -73,6 +83,11 @@ public class ServiceConfiguration {
         DefaultMessageHandlerMethodFactory factory = new DefaultMessageHandlerMethodFactory();
         factory.setMessageConverter(consumerJackson2MessageConverter());
         return factory;
+    }
+
+    @Bean
+    public Jackson2JsonMessageConverter messageConverter() {
+        return new Jackson2JsonMessageConverter();
     }
 
     @Bean
